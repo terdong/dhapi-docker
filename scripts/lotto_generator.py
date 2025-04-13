@@ -43,7 +43,7 @@ if "RuntimeError" in result:
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
     EMAIL_TO = os.getenv("EMAIL_TO")
 
-    subject = f"로또 구매 실패: {lotto_numbers}\n"
+    subject = f"로또 구매 실패: {lotto_number}\n"
     body = f"dhapi buy-lotto645 실행 중 오류 발생:\n\n{result}"
     msg = MIMEText(body)
     msg["Subject"] = subject
@@ -59,6 +59,6 @@ if "RuntimeError" in result:
         result = result + f"이메일 전송 실패: {e}"
 
 # 결과 저장
-log_entry = f"{now.strftime('%Y-%m-%d %H:%M:%S')} - {lotto_numbers} - {result.strip()}\n"
+log_entry = f"{now.strftime('%Y-%m-%d %H:%M:%S')} - {lotto_number} - {result.strip()}\n"
 with open(f"/app/output/{log_file}", "a") as f:
     f.write(log_entry)
