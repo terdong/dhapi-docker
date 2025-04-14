@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM docker.io/library/python:3.13.3-slim
 
 # 작업디렉토리 설정
 WORKDIR /app
@@ -8,6 +8,9 @@ RUN pip install --upgrade pip
 
 # dhapi 설치
 RUN pip install dhapi
+
+# returns 설치
+RUN pip install returns
 
 # 작업 디렉토리 설정 및 cron 설치
 RUN apt-get update && apt-get install -y cron

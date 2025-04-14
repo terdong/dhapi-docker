@@ -13,4 +13,4 @@ echo "0 10 * * 0 /app/run_with_env.sh >> /app/output/crontab.log 2>&1" | crontab
 cron -f
 
 # For test
-# python /app/run_lotto.py "$LOTTO_NUMBERS"
+# python /app/run_with_env.py
