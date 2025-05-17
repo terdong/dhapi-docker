@@ -6,11 +6,8 @@ WORKDIR /app
 # pip 업그레이드
 RUN pip install --upgrade pip
 
-# dhapi 설치
-RUN pip install dhapi
-
-# returns 설치
-RUN pip install returns
+# 필요한 패키지 설치
+RUN pip install dhapi returns beautifulsoup4 lxml
 
 # 작업 디렉토리 설정 및 cron 설치
 RUN apt-get update && apt-get install -y cron

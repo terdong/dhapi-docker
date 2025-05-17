@@ -11,13 +11,21 @@ from returns.pipeline import flow
 from returns.pipeline import is_successful
 from returns.pointfree import bind
 from typing import Union
+import my_lotto_number_manager as my_lotto
+import lotto_info_manager as lotto_manager
 
 # "잔액이 부족합니다" 예외 타입
 class BalanceInsufficientError(Exception):
     pass
 
+OUTPUT_DIR_PATH="/app/output"
+LOTTO_NUMBERS_FILE_PATH = f"{OUTPUT_DIR_PATH}/lotto_number_history.json"
+
 # 메일 알림을 위한 추가 메시지
-post_script=""
+post_scripts=[]
+
+# 구매한 로또 번호 리스트
+purchased_lotto_numbers=[]
 
 def get_lotto_buy_count() -> int:
     lotto_buy_count_str = os.getenv("LOTTO_BUY_COUNT")
@@ -56,7 +64,7 @@ def process_balance(result: str) -> str:
                     if total_deposit_num >= lotto_buy_amount:
                         if total_deposit_num - lotto_buy_amount < lotto_buy_amount:
                             global post_script
-                            post_script = f"\n\np.s. 다음 구매 예정 금액이 부족합니다. 총 예치금: {total_deposit_str} 원, 필요한 금액: {lotto_buy_amount:,} 원"
+                            post_script.append(f"다음 구매 예정 금액이 부족합니다. 총 예치금: {total_deposit_str} 원, 필요한 금액: {lotto_buy_amount:,} 원")
                         return total_deposit_str
                     else:
                         error_msg = f"잔액이 부족합니다. 총 예치금: {total_deposit_str} 원, 필요한 금액: {lotto_buy_amount:,} 원"
@@ -80,6 +88,7 @@ def process_lotto(_:str):
                 is_valid = False
 
         lotto_number = lotto_number_str if is_valid else ",".join(map(str, sorted(random.sample(range(1, 45), 6))))
+        purchased_lotto_numbers.append([int(x.strip()) for x in lotto_number.split(',')])
         lotto_number_list.append(lotto_number)
     # print(f"lotto_buy_count: {lotto_buy_count}\nlotto_number_list: {lotto_number_list}")
     return lotto_number_list
@@ -114,6 +123,37 @@ def process_result(result):
         case Failure(Exception() as e):
             return ("로또 구매 실패",str(e))
 
+# 로그파일에 로그 쓰기
+def write_log(log_file, log_data):
+    now = datetime.datetime.now()
+    month = now.strftime("%Y-%m")
+    log_entry = f"{now.strftime('%Y-%m-%d %H:%M:%S')} - {log_data}\n"
+    with open(f"{OUTPUT_DIR_PATH}/{log_file}", "a") as f:
+        f.write(log_entry)
+
+# 로또 당첨 여부 확인
+def check_lotto_win(purchased_lotto_numbers: list, winning_lotto_numbers: list) -> int:
+    main_numbers = winning_lotto_numbers[:6]  # 당첨 번호 6개
+    bonus_number = winning_lotto_numbers[6]   # 보너스 번호(7번째 요소)
+
+    match_count = len(set(purchased_lotto_numbers) & set(main_numbers))  # 일치하는 번호 개수
+
+    if match_count == 6:
+        return 1  # 1등
+    elif match_count == 5 and bonus_number in purchased_lotto_numbers:
+        return 2  # 2등
+    elif match_count == 5:
+        return 3  # 3등
+    elif match_count == 4:
+        return 4  # 4등
+    elif match_count == 3:
+        return 5  # 5등
+    else:
+        return 0  # 당첨 없음
+
+def convert_fomatted_numbers(numbers):
+    return ' '.join(f'{n:02d}' for n in numbers)
+
 # 메인 로직
 def main():
     flow_result = flow(
@@ -123,25 +163,37 @@ def main():
         bind(process_lotto),
         bind(run_dhapi_command)
     )
+
+    # 지난 로또 결과 확인
+    last_round = lotto_manager.last_round()
+    (my_last_round, my_last_lottos) = my_lotto.load_list_with_title(LOTTO_NUMBERS_FILE_PATH, last_round)
+    if my_last_round == last_round:
+        last_week_winning_lotto_number = lotto_manager.get_last_lotto_number()
+        result_strings = [f"{last_round}회차 당첨번호는 {convert_fomatted_numbers(last_week_winning_lotto_number[:6])}(보너스번호: {last_week_winning_lotto_number[6]})이며,"]
+        for numbers in my_last_lottos:
+            result_number = check_lotto_win(numbers, last_week_winning_lotto_number)
+            result_strings.append(f"구매한 {convert_fomatted_numbers(numbers)} 의 당첨결과는 \"{str(result_number) + '등' if result_number != 0 else '꽝'}\" 입니다. {'축하합니다!!' if result_number > 0 else ''}")
+        post_scripts.append('\n'.join(result_strings))
+
     # 결과 메일로 전송
     subject, body = process_result(flow_result)
-    mail_result = send_mail(subject, body+post_script).alt(lambda e: f"메일전송 실패: {str(e)}")
+    post_scripts_body = "\n\n" + '\n'.join([f"p.s. {s}" for s in post_scripts])
+    total_body = body + post_scripts_body
+    mail_result = send_mail(subject, total_body).alt(lambda e: f"메일전송 실패: {str(e)}")
+
+    # 구매한 로또 번호 저장
+    if is_successful(flow_result):
+        my_lotto.append_list_with_title(LOTTO_NUMBERS_FILE_PATH, last_round+1, purchased_lotto_numbers)
 
     # 로그데이터 생성
-    result = mail_result if not is_successful(mail_result) else flow_result
+    log_data = (mail_result if not is_successful(mail_result) else flow_result) + post_scripts_body
 
-    # 로그파일 생성
-    now = datetime.datetime.now()
-    month = now.strftime("%Y-%m")
+    # 로그파일 생성 및 쓰기
     log_file = f"lotto_{month}.log"
-
-    # 결과 저장
-    log_entry = f"{now.strftime('%Y-%m-%d %H:%M:%S')} - {result}\n"
-    with open(f"/app/output/{log_file}", "a") as f:
-        f.write(log_entry)
+    write_log(log_file, log_data)
 
     # 결과 출력 for crontab log
-    print(log_entry)
+    #print(log_data)
 
 if __name__ == "__main__":
     main()
