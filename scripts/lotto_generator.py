@@ -63,8 +63,8 @@ def process_balance(result: str) -> str:
                     lotto_buy_amount = get_lotto_buy_count() * 1000
                     if total_deposit_num >= lotto_buy_amount:
                         if total_deposit_num - lotto_buy_amount < lotto_buy_amount:
-                            global post_script
-                            post_script.append(f"다음 구매 예정 금액이 부족합니다. 총 예치금: {total_deposit_str} 원, 필요한 금액: {lotto_buy_amount:,} 원")
+                            global post_scripts
+                            post_scripts.append(f"다음 구매 예정 금액이 부족합니다. 총 예치금: {total_deposit_str} 원, 필요한 금액: {lotto_buy_amount:,} 원")
                         return total_deposit_str
                     else:
                         error_msg = f"잔액이 부족합니다. 총 예치금: {total_deposit_str} 원, 필요한 금액: {lotto_buy_amount:,} 원"
