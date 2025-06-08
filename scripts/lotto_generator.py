@@ -124,9 +124,10 @@ def process_result(result):
             return ("로또 구매 실패",str(e))
 
 # 로그파일에 로그 쓰기
-def write_log(log_file, log_data):
+def write_log(log_data):
     now = datetime.datetime.now()
     month = now.strftime("%Y-%m")
+    log_file = f"lotto_{month}.log"
     log_entry = f"{now.strftime('%Y-%m-%d %H:%M:%S')} - {log_data}\n"
     with open(f"{OUTPUT_DIR_PATH}/{log_file}", "a") as f:
         f.write(log_entry)
@@ -186,11 +187,10 @@ def main():
         my_lotto.append_list_with_title(LOTTO_NUMBERS_FILE_PATH, last_round+1, purchased_lotto_numbers)
 
     # 로그데이터 생성
-    log_data = (mail_result if not is_successful(mail_result) else flow_result) + post_scripts_body
+    log_data = f"{mail_result if not is_successful(mail_result) else flow_result}{post_scripts_body}"
 
     # 로그파일 생성 및 쓰기
-    log_file = f"lotto_{month}.log"
-    write_log(log_file, log_data)
+    write_log(log_data)
 
     # 결과 출력 for crontab log
     #print(log_data)

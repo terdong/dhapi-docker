@@ -1,3 +1,4 @@
 output
 .history
 .env
+scripts/__pycache__
